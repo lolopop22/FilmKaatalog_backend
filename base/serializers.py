@@ -54,7 +54,7 @@ class FilmSerializer(ModelSerializer):
         validated_data['catalog_id'] = catalog_id
         film, created = Film.objects.get_or_create(**validated_data)
 
-        if not created:
+        if created:
             for data_director in directors:
                 director, created = Director.objects.get_or_create(name=data_director['name'])
                 print("hello director")

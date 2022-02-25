@@ -1,3 +1,5 @@
+from timeit import default_timer as timer
+from datetime import timedelta
 from django.shortcuts import render
 import imdb
 from rest_framework import status
@@ -14,30 +16,36 @@ class FilmAPIView(APIView, PageNumberPagination):  # LimitOffsetPagination
 
     def get(self, request, *args, **kwargs):
         
-        title = self.request.GET.get('title')
+        start = timer()
+
+        title_ = self.request.GET.get('title')
 
         print("---------------------")
-        print(f"Searching for the film with title: {title}")
+        print(f"Searching for the film with title: {title_}")
 
-        if title:
+        if title_:
             # Fetch the movie(s) with the given name from IMDb
             films = []
             try:
                 movie_db = imdb.Cinemagoer()
-                movies = movie_db.search_movie(title)
-                movie_ids = [movie.movieID for movie in movies if title.lower() in movie['title'].lower()]
+                movies = movie_db.search_movie(title_)
+                movie_ids = [movie.movieID for movie in movies if title_.lower() in movie['title'].lower()]
 
+                if len(movie_ids) != 0:
+                    print(f"Found film(s) with title '{title_}' in cinemagoer database.")
+
+                i = 0
                 for movie_id in movie_ids:
                     movie = movie_db.get_movie(movie_id)
                     title = movie.get('title')
                     poster = movie.get('full-size cover url')
-                    synopsis = movie.get('plot outline')
+                    synopsis = movie.get('plot outline', "Pas de résumé renseigné.")
                     
                     if isinstance(movie.get('runtimes'), list):
                         runtime = "{:02d}h{:02d}min".format(*divmod(int(movie.get('runtimes')[0]), 60)) # conversion des minutes en heure
                     else:
-                        runtime = "Pas de durée renseignée"
-                    
+                        runtime = "Pas de durée renseignée."
+
                     if isinstance(movie.get('director'), list):
                         directors = [director.get('name') for director in movie.get('director')]
                     else:
@@ -64,6 +72,9 @@ class FilmAPIView(APIView, PageNumberPagination):  # LimitOffsetPagination
                     }
                     
                     films.append(movie_info)
+                    print(f"processed {i} film(s)")
+                    i += 1
+                print(f"Consturction of the list of films with title '{title_}' done!")
             except IMDbError as e:
                 print(e)
 
@@ -73,25 +84,41 @@ class FilmAPIView(APIView, PageNumberPagination):  # LimitOffsetPagination
                     "results": films
                 }
             }
-
+            end = timer()
+            print(f"elapsed time with get request: {timedelta(seconds=end-start)}")
             return Response(results, status=status.HTTP_200_OK)
         else:
             films = Film.objects.all()
-            query_set = self.paginate_queryset(films, request, view=self)
-            serializer = FilmSerializer(query_set, many=True)
-            return self.get_paginated_response(serializer.data)
+            # query_set = self.paginate_queryset(films, request, view=self)
+            # serializer = FilmSerializer(query_set, many=True)
+            serializer = FilmSerializer(films, many=True)
+            end = timer()
+            print(f"elapsed time with get request: {timedelta(seconds=end-start)}")
+            # return self.get_paginated_response(serializer.data)
+            return Response({'results': serializer.data}, status=status.HTTP_200_OK)
     
     def post(self, request, *args, **kwargs):
         
-        serializer = FilmSerializer(data = request.data)
-        print("--------------------------------------------")
+        start = timer()
+
+        print("........................Saving a film in the database........................")
         print(f"request data: {request.data}")
+        
+        data = request.data
+
+        print(f"Data updated: {data}")
+
+        serializer = FilmSerializer(data = data)
+        print("--------------------------------------------")
         print(f"serializer: {serializer}")
         print("--------------------------------------------")
         if serializer.is_valid():
             print("serializer is valid!")
             serializer.save()
             print(f"serializer data: {serializer.data}")
+            print("........................Film saved in the database........................")
+            end = timer()
+            print(f"elapsed time with get request: {timedelta(seconds=end-start)}")
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
         print('serializer is not valid.')
         return Response({'data': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)

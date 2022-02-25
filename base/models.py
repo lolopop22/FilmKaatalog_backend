@@ -31,7 +31,7 @@ class Cast(models.Model):
 
 class Film(models.Model):
     title = models.CharField(max_length=255)
-    runtime = models.CharField(max_length=10)
+    runtime = models.CharField(max_length=50)
     synopsis = models.TextField(blank=True)
     poster = models.TextField(blank=True)
 
